@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
     container_name: acme_app
     restart: unless-stopped
     working_dir: /var/www/html
@@ -12,7 +15,8 @@ services:
     networks:
       - acme_network
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   mysql:
     image: mysql:8.0
@@ -29,6 +33,12 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - acme_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-psecret"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   nginx:
     image: nginx:alpine
