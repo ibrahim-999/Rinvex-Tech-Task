@@ -25,6 +25,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
@@ -43,6 +44,8 @@ use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
+use Filament\Tables\Columns\Summarizers\Average;
+use Filament\Tables\Columns\Summarizers\Count;
 
 class SkillResource extends Resource
 {
@@ -143,7 +146,8 @@ class SkillResource extends Resource
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->summarize(Count::make()->label('Total')),
 
                 TextColumn::make('category')
                     ->searchable()
@@ -153,7 +157,8 @@ class SkillResource extends Resource
                 TextColumn::make('proficiency_level')
                     ->sortable()
                     ->formatStateUsing(fn ($state) => $state ? str_repeat('★', $state) . str_repeat('☆', 5 - $state) : '-')
-                    ->label('Proficiency'),
+                    ->label('Proficiency')
+                    ->summarize(Average::make()->label('Avg')),
 
                 IconColumn::make('is_active')
                     ->boolean()
@@ -297,10 +302,10 @@ class SkillResource extends Resource
 
                 Section::make('Attachments')
                     ->schema([
-                        TextEntry::make('attachments')
-                            ->listWithLineBreaks()
-                            ->bulleted()
-                            ->columnSpanFull(),
+                        ImageEntry::make('attachments')
+                            ->stacked()
+                            ->limit(3)
+                            ->circular(),
                     ])
                     ->collapsible()
                     ->visible(fn ($record) => !empty($record->attachments)),
