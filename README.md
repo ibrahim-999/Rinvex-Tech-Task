@@ -1,59 +1,145 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Acme - Team Skills Tracker
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Filament v4 module for managing team skills, built as a tech assignment for Rinvex.
 
-## About Laravel
+## Quick Setup
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+```bash
+# Clone and enter the project
+git clone <repo-url> acme
+cd acme
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+# Copy environment file
+cp .env.example .env
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+# Run full setup (Docker, dependencies, migrations, seeding)
+make setup
+```
 
-## Learning Laravel
+**Access the application:**
+- URL: http://localhost:8000/admin
+- Email: `admin@acme.test`
+- Password: `password`
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Manual Setup
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+If `make` is unavailable:
 
-## Laravel Sponsors
+```bash
+# Start containers
+docker-compose up -d
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+# Install dependencies
+docker-compose exec app composer install
+docker-compose exec app npm install
 
-### Premium Partners
+# Setup Laravel
+docker-compose exec app php artisan key:generate
+docker-compose exec app php artisan migrate --seed
+docker-compose exec app php artisan storage:link
+docker-compose exec app npm run build
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Running Tests
 
-## Contributing
+```bash
+  make test
+# or
+docker-compose exec app ./vendor/bin/pest
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Useful Commands
 
-## Code of Conduct
+| Command | Description |
+|---------|-------------|
+| `make up` | Start containers |
+| `make down` | Stop containers |
+| `make shell` | Access app container |
+| `make fresh` | Fresh migration with seed |
+| `make test` | Run tests |
+| `make logs` | View container logs |
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Architectural Decisions
 
-## Security Vulnerabilities
+### 1. Action Classes for Business Logic
+Extracted `ArchiveSkillAction` and `SyncCategoriesFromApiAction` into dedicated action classes. This keeps controllers/resources thin and makes the logic testable and reusable.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 2. Cluster-Based Navigation
+Used Filament's cluster feature (`SkillsManagement`) to group skill-related pages. This provides a clean navigation structure with badge counts.
 
-## License
+### 3. Form Wizard
+Implemented a 3-step wizard (Basic Info → Details → Media & Tags) to organize the form logically without overwhelming users. Made it skippable for quick edits.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### 4. Conditional Field Visibility
+`proficiency_level` only appears when `category = "Technical"`, demonstrating Filament's reactive forms with `->visible(fn (Get $get) => ...)`.
+
+### 5. Database Notifications + Flash Notifications
+Used both notification types as required:
+- Flash notifications for immediate feedback (create/update)
+- Database notifications for the archive action (persisted in notification center)
+
+### 6. External API Integration
+`PublicApisClient` fetches categories from a public API with:
+- Caching (1 hour TTL)
+- Graceful fallback to default categories on failure
+- Error logging
+
+### 7. Policy-Based Authorization
+`SkillPolicy` controls access. Notable: archived skills cannot be deleted (`delete` returns `false` if archived).
+
+### 8. Factory States
+`SkillFactory` includes states (`active()`, `inactive()`, `archived()`, `technical()`) for expressive test setup.
+
+## What I Would Improve With More Time
+
+1. **More comprehensive tests** - Add tests for filters, widgets, and edge cases
+2. **Bulk actions** - Bulk archive/activate skills from the table
+3. **Activity log viewer** - A relation manager to view skill history in the admin panel
+4. **Export functionality** - Export skills to CSV/Excel
+5. **Soft deletes** - Instead of hard deletes, implement soft deletes with restore capability
+6. **Category management** - Separate CRUD for categories instead of free-text input
+7. **File preview** - Better attachment previews in the infolist (thumbnails, PDF viewer)
+8. **Performance** - Add database indexes review, query optimization for large datasets
+9. **API documentation** - If API was required, add OpenAPI/Swagger docs
+
+## Project Structure
+
+```
+app/
+├── Actions/
+│   ├── ArchiveSkillAction.php
+│   └── SyncCategoriesFromApiAction.php
+├── Console/
+│   └── Commands/
+│       └── SyncCategoriesCommand.php
+├── Filament/
+│   ├── Clusters/
+│   │   └── SkillsManagement.php
+│   ├── Resources/
+│   │   └── SkillResource.php
+│   │       └── Pages/
+│   │           ├── CreateSkill.php
+│   │           ├── EditSkill.php
+│   │           ├── ListSkills.php
+│   │           └── ViewSkill.php
+│   └── Widgets/
+│       ├── ProficiencyDistribution.php
+│       └── SkillStatsOverview.php
+├── Integrations/
+│   └── PublicApisClient.php
+├── Models/
+│   ├── Skill.php
+│   └── SkillActivity.php
+└── Policies/
+    └── SkillPolicy.php
+```
+
+## Tech Stack
+
+- PHP 8.3
+- Laravel 12
+- Filament v4
+- Livewire 3
+- Alpine.js
+- MySQL 8.0
+- Docker + Nginx
